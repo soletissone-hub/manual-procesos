@@ -137,8 +137,8 @@ def main():
         items.append({**m, 'n': i, 'area': d.get('area', 'General'), 'id': d['id'], 'html': h})
     items.sort(key=lambda x: (x['area'], x['titulo']))
 
-    # Huella del contenido (HMAC con la clave: no revela nada del texto). Si no cambió, no se publica.
-    huella = hmac.new(clave.encode(), json.dumps(items, ensure_ascii=False, sort_keys=True).encode(), hashlib.sha256).hexdigest()
+    # Huella del contenido + plantillas (HMAC con la clave: no revela nada del texto). Si no cambió, no se publica.
+    huella = hmac.new(clave.encode(), (json.dumps(items, ensure_ascii=False, sort_keys=True) + open(os.path.join(SCRIPTS, 'plantilla.html'), encoding='utf8').read() + open(os.path.join(SCRIPTS, 'candado.html'), encoding='utf8').read()).encode(), hashlib.sha256).hexdigest()
     arch_huella = os.path.join(RAIZ, 'huella.txt')
     previa = open(arch_huella).read().strip() if os.path.exists(arch_huella) else ''
     if huella == previa and not os.environ.get('FORZAR'):

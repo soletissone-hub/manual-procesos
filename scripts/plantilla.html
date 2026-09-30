@@ -31,6 +31,21 @@ article{max-width:860px;margin:0 auto;background:var(--card);border:1px solid va
 .doc a{color:var(--accent);word-break:break-word}
 .doc p{margin:.45em 0}
 .doc li{margin:.2em 0}
+.btn-preg{font:600 .9rem system-ui,sans-serif;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;white-space:nowrap}
+@media (prefers-color-scheme:dark){.btn-preg{color:#0d1320}}
+.preg{max-width:860px;margin:0 auto}
+.preg form{display:flex;gap:8px;margin:0 0 10px}
+.preg input{flex:1;min-width:0;font:inherit;font-size:1.05rem;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.preg .estado{color:var(--muted);font-size:.88rem;min-height:1.3em;margin:0 0 12px}
+.preg .sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.preg .sug button{font:inherit;font-size:.85rem;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:5px 11px;color:var(--ink);cursor:pointer}
+.resp{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.resp .de{font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.resp blockquote{margin:0;font-size:1rem}
+.resp a{font-size:.85rem;color:var(--accent);display:inline-block;margin-top:8px}
+.nores{background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:16px;color:var(--muted)}
+.nota{font-size:.78rem;color:var(--muted);margin-top:14px}
+.doc .hl{background:var(--mark);border-radius:4px;box-shadow:0 0 0 4px var(--mark)}
 mark{background:var(--mark);color:inherit;border-radius:2px}
 .res{max-width:860px;margin:0 auto}
 .res a{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:var(--ink);text-decoration:none}
@@ -51,6 +66,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
   <button id="menu" aria-label="Índice">☰</button>
   <h1>Manual de procesos</h1>
   <input id="q" type="search" placeholder="Buscar en todos los documentos…" aria-label="Buscar">
+  <button id="preg" class="btn-preg">Preguntar</button>
   <button id="salir" title="Olvidar la contraseña en este dispositivo">Salir</button>
 </header>
 <div class="wrap"><nav id="nav"></nav><main id="main"></main></div>
@@ -92,13 +108,91 @@ function buscar(q){
     const frag=i<0?'':(a?'…':'')+esc(d.texto.slice(a,i))+'<mark>'+esc(d.texto.slice(i,i+nq.length))+'</mark>'+esc(d.texto.slice(i+nq.length,i+nq.length+120))+'…';
     return `<a href="#d${d.n}" data-q="${esc(q.trim())}"><b>${esc(d.titulo)}</b><span>${frag}</span></a>`}).join(''):'<p class="vacio">No hay resultados.</p>')+'</div>';
 }
-function ruta(){const m=location.hash.match(/^#d(\d+)/);verDoc(m?m[1]:(DOCS[0]&&DOCS[0].n));document.body.classList.remove('nav-abierto')}
+function ruta(){if(location.hash==='#preguntar'){verPreguntar();document.body.classList.remove('nav-abierto');return}const m=location.hash.match(/^#d(\d+)/);verDoc(m?m[1]:(DOCS[0]&&DOCS[0].n));document.body.classList.remove('nav-abierto')}
 $('#q').addEventListener('input',e=>buscar(e.target.value));
 $('#main').addEventListener('click',e=>{const a=e.target.closest('.res a');if(!a)return;e.preventDefault();
   const q=a.dataset.q;$('#q').value='';history.pushState(null,'',a.getAttribute('href'));ruta();resaltar($('.doc'),q)});
 $('#menu').onclick=()=>document.body.classList.toggle('nav-abierto');
 $('#salir').onclick=()=>{try{localStorage.removeItem('mp-k');sessionStorage.removeItem('mp-k')}catch(e){}location.reload()};
 window.addEventListener('hashchange',()=>{$('#q').value='';ruta()});
+
+/* ---------- Asistente: responde solo con fragmentos textuales del manual ---------- */
+const STOP=new Set('a al algo como con cual cuales cuando de del el ella en es esa ese eso esta este esto hay la las le lo los mas me mi no o para pero por que se si sin sobre son su sus un una uno y ya debe hace hacer tiene tienen puedo puede donde quien'.split(' '));
+const raiz=w=>w.slice(0,5), toks=s=>norm(s).split(/[^a-z0-9ñ]+/).filter(w=>w.length>2&&!STOP.has(w)).map(raiz);
+let PAS=null,MODELO=null,VECS=null;
+function armarPasajes(){
+  if(PAS)return PAS;PAS=[];
+  DOCS.forEach(d=>{const div=document.createElement('div');div.innerHTML=d.html;
+    const cabecera=div.querySelector('table');let sec='',cur=null;
+    [...div.querySelectorAll('p,li')].forEach((el,i)=>{
+      if(cabecera&&cabecera.contains(el)&&/control de documentos/i.test(cabecera.textContent))return;
+      const t=el.textContent.replace(/\s+/g,' ').trim();if(!t)return;
+      const b=[...el.querySelectorAll('b')].map(x=>x.textContent).join('').replace(/\s+/g,' ').trim();
+      if(b&&b.replace(/[\s:]+$/,'')===t.replace(/[\s:]+$/,'')&&t.length<90){sec=t.replace(/\s*:$/,'');cur=null;return}
+      if(t.length<25&&!cur)return;
+      if(cur&&cur.sec===sec&&cur.t.length+t.length<420&&(!/^[^:]{2,40}:/.test(t)||/^(frecuencia|fuente|nota|ejemplo)s?\s*:/i.test(t))){cur.t+=' '+t;cur.els.push(i);return}
+      cur={n:d.n,sec,t,els:[i]};PAS.push(cur)})});
+  PAS.forEach(p=>p.k=new Set(toks(p.sec+' '+p.t)));
+  return PAS;
+}
+const hash=s=>{let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return 'v1-'+(h>>>0).toString(36)+'-'+s.length};
+function idb(op,key,val){return new Promise(res=>{try{const r=indexedDB.open('manual-ia',1);r.onupgradeneeded=()=>r.result.createObjectStore('v');
+  r.onsuccess=()=>{try{const tx=r.result.transaction('v',op?'readwrite':'readonly'),st=tx.objectStore('v');const q=op?st.put(val,key):st.get(key);
+    q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)}catch(e){res(null)}};r.onerror=()=>res(null)}catch(e){res(null)}})}
+let PREP=null;
+function prepararIA(estado){
+  if(!PREP)PREP=(async()=>{
+    armarPasajes();
+    estado('Preparando el asistente… (la primera vez descarga ~120 MB, después queda guardado)');
+    const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0');
+    const vistos={};
+    MODELO=await T.pipeline('feature-extraction','Xenova/multilingual-e5-small',{dtype:'q8',progress_callback:e=>{
+      if(e.status==='progress'&&e.total){vistos[e.file]=[e.loaded,e.total];const l=Object.values(vistos).reduce((a,x)=>a+x[0],0),tt=Object.values(vistos).reduce((a,x)=>a+x[1],0);
+        estado(`Preparando el asistente… ${Math.round(l/tt*100)}% (solo la primera vez)`)}}});
+    const clave=hash(PAS.map(p=>p.sec+p.t).join('|'));
+    let v=await idb(0,clave);
+    if(!v||v.length!==PAS.length){
+      v=[];for(let i=0;i<PAS.length;i+=16){estado(`Leyendo el manual… ${Math.round(i/PAS.length*100)}%`);
+        const out=await MODELO(PAS.slice(i,i+16).map(p=>'passage: '+(p.sec?p.sec+'. ':'')+p.t),{pooling:'mean',normalize:true});v.push(...out.tolist())}
+      idb(1,clave,v);
+    }
+    VECS=v;
+  })().catch(e=>{PREP=null;throw e});
+  return PREP;
+}
+const est=s=>{const e=$('#estado');if(e)e.textContent=s};
+async function responder(q){
+  const box=$('#respuestas');box.innerHTML='';
+  try{await prepararIA(est)}catch(e){est('No se pudo cargar el asistente (¿sin conexión?). Probá con el buscador de arriba.');return}
+  est('Buscando…');
+  const [qv]=(await MODELO(['query: '+q],{pooling:'mean',normalize:true})).tolist();
+  const qk=toks(q);
+  const sc=PAS.map((p,i)=>{const sem=VECS[i].reduce((a,x,j)=>a+x*qv[j],0);const kw=qk.length?qk.filter(k=>p.k.has(k)).length/qk.length:0;return{i,sem,kw,s:sem+0.04*kw}}).sort((a,b)=>b.s-a.s);
+  const mejor=sc[0];est('');
+  if(!mejor||(mejor.sem<0.85&&mejor.kw===0)){box.innerHTML='<div class="nores">No encontré esto en el manual. Probá con otras palabras o revisá el índice.</div>';return}
+  const top=sc.filter(x=>x.s>=mejor.s-0.025).slice(0,3);
+  box.innerHTML=top.map(x=>{const p=PAS[x.i],d=DOCS.find(z=>z.n==p.n);
+    return `<div class="resp"><div class="de">Según <b>${esc(d.titulo)}</b>${p.sec?' › '+esc(p.sec):''}</div>
+      <blockquote>${esc(p.t)}</blockquote><a href="#d${p.n}" data-i="${x.i}">Ver en el documento →</a></div>`}).join('')+
+    '<p class="nota">Las respuestas son fragmentos textuales del manual; el asistente no agrega información propia.</p>';
+}
+function verPreguntar(){
+  const ej=['¿Qué es un lead duplicado?','¿Cuándo un registro está gestionado?','¿A qué áreas aplica el funnel?'];
+  $('#main').innerHTML=`<div class="preg"><form id="fp"><input id="qp" placeholder="Escribí tu pregunta…" aria-label="Pregunta" autocomplete="off"><button class="btn-preg">Preguntar</button></form>
+    <div class="sug">${ej.map(e=>`<button type="button">${esc(e)}</button>`).join('')}</div>
+    <div class="estado" id="estado" role="status"></div><div id="respuestas"></div></div>`;
+  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('on'));
+  document.title='Preguntar · Manual de procesos';
+  $('#fp').onsubmit=e=>{e.preventDefault();const q=$('#qp').value.trim();if(q)responder(q)};
+  document.querySelectorAll('.sug button').forEach(b=>b.onclick=()=>{$('#qp').value=b.textContent;responder(b.textContent)});
+  $('#qp').focus();
+  prepararIA(est).then(()=>{if(/Preparando|Leyendo/.test(($('#estado')||{}).textContent||''))est('Listo. Preguntá lo que necesites.')}).catch(()=>est('No se pudo cargar el asistente (¿sin conexión?).'));
+}
+$('#preg').onclick=()=>{$('#q').value='';location.hash='preguntar'};
+$('#main').addEventListener('click',e=>{const a=e.target.closest('.resp a');if(!a)return;e.preventDefault();
+  const p=PAS[a.dataset.i];history.pushState(null,'','#d'+p.n);verDoc(p.n);
+  const els=[...document.querySelectorAll('.doc p,.doc li')];p.els.forEach(i=>els[i]&&els[i].classList.add('hl'));
+  els[p.els[0]]&&els[p.els[0]].scrollIntoView({block:'center'})});
 pintarNav();ruta();
 </script>
 </body></html>
