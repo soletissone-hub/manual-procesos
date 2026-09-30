@@ -50,6 +50,7 @@ mark{background:var(--mark);color:inherit;border-radius:2px}
 .res{max-width:860px;margin:0 auto}
 .res a{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:var(--ink);text-decoration:none}
 .res a:hover{border-color:var(--accent)}
+.res a.ask{border-style:dashed;border-color:var(--accent)}.res a.ask b{color:var(--accent)}
 .res b{display:block;margin-bottom:4px}.res span{color:var(--muted);font-size:.88rem}
 .vacio{color:var(--muted);text-align:center;padding:40px 0}
 a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
@@ -65,7 +66,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(-
 <header>
   <button id="menu" aria-label="Índice">☰</button>
   <h1>Manual de procesos</h1>
-  <input id="q" type="search" placeholder="Buscar en todos los documentos…" aria-label="Buscar">
+  <input id="q" type="search" placeholder="Buscar o preguntar… (Enter para preguntar)" aria-label="Buscar">
   <button id="preg" class="btn-preg">Preguntar</button>
   <button id="salir" title="Olvidar la contraseña en este dispositivo">Salir</button>
 </header>
@@ -99,26 +100,37 @@ function resaltar(root,q){
     const m=document.createElement('mark');const r=document.createRange();r.setStart(n,i);r.setEnd(n,i+q.length);r.surroundContents(m)});
   const p=root.querySelector('mark');if(p)p.scrollIntoView({block:'center'});
 }
+function frag(d,ntq,largo){const i=norm(d.texto).indexOf(ntq);if(i<0)return '';const a=Math.max(0,i-80);
+  return (a?'…':'')+esc(d.texto.slice(a,i))+'<mark>'+esc(d.texto.slice(i,i+largo))+'</mark>'+esc(d.texto.slice(i+largo,i+largo+120))+'…'}
 function buscar(q){
-  const nq=norm(q.trim());
+  q=q.trim();const nq=norm(q);
   if(!nq){ruta();return}
-  const res=DOCS.filter(d=>d.nt.includes(nq));
-  $('#main').innerHTML='<div class="res">'+(res.length?res.map(d=>{
-    const i=norm(d.texto).indexOf(nq),a=Math.max(0,i-80);
-    const frag=i<0?'':(a?'…':'')+esc(d.texto.slice(a,i))+'<mark>'+esc(d.texto.slice(i,i+nq.length))+'</mark>'+esc(d.texto.slice(i+nq.length,i+nq.length+120))+'…';
-    return `<a href="#d${d.n}" data-q="${esc(q.trim())}"><b>${esc(d.titulo)}</b><span>${frag}</span></a>`}).join(''):'<p class="vacio">No hay resultados.</p>')+'</div>';
+  // 1) frase exacta  2) si no hay, todas las palabras importantes
+  let res=DOCS.filter(d=>d.nt.includes(nq)).map(d=>({d,h:q,f:frag(d,nq,nq.length)}));
+  if(!res.length){
+    const pal=norm(q).split(/[^a-z0-9ñ]+/).filter(w=>w.length>1&&!STOP.has(w));
+    if(pal.length)res=DOCS.filter(d=>pal.every(w=>d.nt.includes(w.slice(0,5)))).map(d=>{const w=pal.find(w=>d.nt.includes(w))||pal[0];
+      const i=norm(d.texto).indexOf(w);return{d,h:i<0?'':d.texto.slice(i,i+w.length),f:frag(d,w,w.length)}});
+  }
+  const preg=`<a class="ask" href="#preguntar" data-ask="${esc(q)}"><b>💬 Preguntarle al asistente: «${esc(q)}»</b><span>Muestra la parte del manual que responde la pregunta (o Enter).</span></a>`;
+  $('#main').innerHTML='<div class="res">'+preg+(res.length?res.map(r=>
+    `<a href="#d${r.d.n}" data-q="${esc(r.h)}"><b>${esc(r.d.titulo)}</b><span>${r.f}</span></a>`).join(''):'<p class="vacio">No aparece ese texto en los documentos.</p>')+'</div>';
 }
 function ruta(){if(location.hash==='#preguntar'){verPreguntar();document.body.classList.remove('nav-abierto');return}const m=location.hash.match(/^#d(\d+)/);verDoc(m?m[1]:(DOCS[0]&&DOCS[0].n));document.body.classList.remove('nav-abierto')}
 $('#q').addEventListener('input',e=>buscar(e.target.value));
+let PEND='';
+function irAPreguntar(q){PEND=q;$('#q').value='';if(location.hash==='#preguntar')ruta();else location.hash='preguntar'}
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value.trim()){e.preventDefault();irAPreguntar(e.target.value.trim())}});
 $('#main').addEventListener('click',e=>{const a=e.target.closest('.res a');if(!a)return;e.preventDefault();
-  const q=a.dataset.q;$('#q').value='';history.pushState(null,'',a.getAttribute('href'));ruta();resaltar($('.doc'),q)});
+  if(a.dataset.ask!==undefined){irAPreguntar(a.dataset.ask);return}
+  const q=a.dataset.q;$('#q').value='';history.pushState(null,'',a.getAttribute('href'));ruta();if(q)resaltar($('.doc'),q)});
 $('#menu').onclick=()=>document.body.classList.toggle('nav-abierto');
 $('#salir').onclick=()=>{try{localStorage.removeItem('mp-k');sessionStorage.removeItem('mp-k')}catch(e){}location.reload()};
 window.addEventListener('hashchange',()=>{$('#q').value='';ruta()});
 
 /* ---------- Asistente: responde solo con fragmentos textuales del manual ---------- */
-const STOP=new Set('a al algo como con cual cuales cuando de del el ella en es esa ese eso esta este esto hay la las le lo los mas me mi no o para pero por que se si sin sobre son su sus un una uno y ya debe hace hacer tiene tienen puedo puede donde quien'.split(' '));
-const raiz=w=>w.slice(0,5), toks=s=>norm(s).split(/[^a-z0-9ñ]+/).filter(w=>w.length>2&&!STOP.has(w)).map(raiz);
+const STOP=new Set('le lo mas qu a al algo como con cual cuales cuando de del el ella en es esa ese eso esta este esto hay la las le lo los mas me mi no o para pero por que se si sin sobre son su sus un una uno y ya debe hace hacer tiene tienen puedo puede donde quien'.split(' '));
+const raiz=w=>w.slice(0,5), toks=s=>norm(s).split(/[^a-z0-9ñ]+/).filter(w=>w.length>1&&!STOP.has(w)).map(raiz);
 let PAS=null,MODELO=null,VECS=null;
 function armarPasajes(){
   if(PAS)return PAS;PAS=[];
@@ -143,16 +155,16 @@ let PREP=null;
 function prepararIA(estado){
   if(!PREP)PREP=(async()=>{
     armarPasajes();
-    estado('Preparando el asistente… (la primera vez descarga ~120 MB, después queda guardado)');
+    estado('Preparando el asistente… (la primera vez descarga ~120 MB, después queda guardado). Ya podés preguntar.');
     const T=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0');
     const vistos={};
     MODELO=await T.pipeline('feature-extraction','Xenova/multilingual-e5-small',{dtype:'q8',progress_callback:e=>{
       if(e.status==='progress'&&e.total){vistos[e.file]=[e.loaded,e.total];const l=Object.values(vistos).reduce((a,x)=>a+x[0],0),tt=Object.values(vistos).reduce((a,x)=>a+x[1],0);
-        estado(`Preparando el asistente… ${Math.round(l/tt*100)}% (solo la primera vez)`)}}});
+        PCT=Math.round(l/tt*100)+'%';if(!$('#respuestas')||!$('#respuestas').innerHTML)estado(`Preparando el asistente… ${PCT} (solo la primera vez)`)}}});
     const clave=hash(PAS.map(p=>p.sec+p.t).join('|'));
     let v=await idb(0,clave);
     if(!v||v.length!==PAS.length){
-      v=[];for(let i=0;i<PAS.length;i+=16){estado(`Leyendo el manual… ${Math.round(i/PAS.length*100)}%`);
+      v=[];for(let i=0;i<PAS.length;i+=16){PCT='casi listo';if(!$('#respuestas')||!$('#respuestas').innerHTML)estado(`Leyendo el manual… ${Math.round(i/PAS.length*100)}%`);
         const out=await MODELO(PAS.slice(i,i+16).map(p=>'passage: '+(p.sec?p.sec+'. ':'')+p.t),{pooling:'mean',normalize:true});v.push(...out.tolist())}
       idb(1,clave,v);
     }
@@ -161,20 +173,38 @@ function prepararIA(estado){
   return PREP;
 }
 const est=s=>{const e=$('#estado');if(e)e.textContent=s};
+let PCT='';
+function porPalabras(q){
+  const qk=toks(q);if(!qk.length)return[];
+  return PAS.map((p,i)=>{const hits=qk.filter(k=>p.k.has(k)).length;if(!hits)return null;
+    const ini=toks(p.t.split(':')[0]);const def=/^[^:]{2,40}:/.test(p.t)&&qk.some(k=>ini.includes(k))?0.3:0;
+    return{i,s:hits/qk.length+def-p.t.length/5000}}).filter(Boolean).sort((a,b)=>b.s-a.s).slice(0,3);
+}
+function mostrar(top,nota){
+  const box=$('#respuestas');
+  if(!top.length){box.innerHTML='<div class="nores">No encontré esto en el manual. Probá con otras palabras o revisá el índice.</div>';return}
+  box.innerHTML=top.map(x=>{const p=PAS[x.i],d=DOCS.find(z=>z.n==p.n);
+    return `<div class="resp"><div class="de">Según <b>${esc(d.titulo)}</b>${p.sec?' › '+esc(p.sec):''}</div>
+      <blockquote>${esc(p.t)}</blockquote><a href="#d${p.n}" data-i="${x.i}">Ver en el documento →</a></div>`}).join('')+
+    `<p class="nota">${nota||'Las respuestas son fragmentos textuales del manual; el asistente no agrega información propia.'}</p>`;
+}
+let ULTIMA='';
 async function responder(q){
-  const box=$('#respuestas');box.innerHTML='';
-  try{await prepararIA(est)}catch(e){est('No se pudo cargar el asistente (¿sin conexión?). Probá con el buscador de arriba.');return}
+  ULTIMA=q;armarPasajes();$('#respuestas').innerHTML='';
+  if(!VECS){
+    // Respuesta inmediata por palabras mientras el modelo carga (o si no se puede cargar)
+    mostrar(porPalabras(q),'Respuesta rápida por palabras clave. '+(PCT?'El asistente completo se está preparando ('+PCT+'); en cuanto esté listo se actualiza sola.':''));
+    est('');
+    prepararIA(est).then(()=>{if(ULTIMA===q)responder(q)}).catch(()=>{est('');const n=document.querySelector('.nota');if(n)n.textContent='Respuesta por palabras clave (el asistente completo no se pudo cargar en esta red).'});
+    return;
+  }
   est('Buscando…');
   const [qv]=(await MODELO(['query: '+q],{pooling:'mean',normalize:true})).tolist();
   const qk=toks(q);
   const sc=PAS.map((p,i)=>{const sem=VECS[i].reduce((a,x,j)=>a+x*qv[j],0);const kw=qk.length?qk.filter(k=>p.k.has(k)).length/qk.length:0;return{i,sem,kw,s:sem+0.04*kw}}).sort((a,b)=>b.s-a.s);
   const mejor=sc[0];est('');
-  if(!mejor||(mejor.sem<0.85&&mejor.kw===0)){box.innerHTML='<div class="nores">No encontré esto en el manual. Probá con otras palabras o revisá el índice.</div>';return}
-  const top=sc.filter(x=>x.s>=mejor.s-0.025).slice(0,3);
-  box.innerHTML=top.map(x=>{const p=PAS[x.i],d=DOCS.find(z=>z.n==p.n);
-    return `<div class="resp"><div class="de">Según <b>${esc(d.titulo)}</b>${p.sec?' › '+esc(p.sec):''}</div>
-      <blockquote>${esc(p.t)}</blockquote><a href="#d${p.n}" data-i="${x.i}">Ver en el documento →</a></div>`}).join('')+
-    '<p class="nota">Las respuestas son fragmentos textuales del manual; el asistente no agrega información propia.</p>';
+  if(!mejor||(mejor.sem<0.85&&mejor.kw===0)){mostrar([]);return}
+  mostrar(sc.filter(x=>x.s>=mejor.s-0.025).slice(0,3));
 }
 function verPreguntar(){
   const ej=['¿Qué es un lead duplicado?','¿Cuándo un registro está gestionado?','¿A qué áreas aplica el funnel?'];
@@ -186,6 +216,7 @@ function verPreguntar(){
   $('#fp').onsubmit=e=>{e.preventDefault();const q=$('#qp').value.trim();if(q)responder(q)};
   document.querySelectorAll('.sug button').forEach(b=>b.onclick=()=>{$('#qp').value=b.textContent;responder(b.textContent)});
   $('#qp').focus();
+  if(PEND){const q=PEND;PEND='';$('#qp').value=q;responder(q)}
   prepararIA(est).then(()=>{if(/Preparando|Leyendo/.test(($('#estado')||{}).textContent||''))est('Listo. Preguntá lo que necesites.')}).catch(()=>est('No se pudo cargar el asistente (¿sin conexión?).'));
 }
 $('#preg').onclick=()=>{$('#q').value='';location.hash='preguntar'};
