@@ -1,7 +1,7 @@
 name: Actualizar manual desde Google Docs
 on:
   schedule:
-    - cron: '*/30 * * * *'   # cada 30 minutos
+    - cron: '0 13 * * 1'   # lunes 7:00 hora CDMX (13:00 UTC)
   workflow_dispatch:          # botón "Run workflow" para actualizar ya
 permissions:
   contents: write
