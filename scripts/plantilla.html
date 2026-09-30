@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Manual de procesos</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1c2230;--muted:#5d6475;--line:#d9dce3;--accent:#1f4fa3;--soft:#e8eefb;--mark:#fff1a8;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#eceff4;--muted:#9aa2b2;--line:#2f3542;--accent:#7aa2f0;--soft:#232c3d;--mark:#5b4c00;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center}
+header h1{font-size:1.05rem;margin:0;white-space:nowrap}
+#q{flex:1;min-width:0;font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+#menu{display:none;font:inherit;background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink)}
+#salir{font:inherit;font-size:.85rem;background:none;border:0;color:var(--muted);cursor:pointer;white-space:nowrap}
+.wrap{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 55px)}
+nav{border-right:1px solid var(--line);background:var(--card);padding:14px 10px;overflow:auto;position:sticky;top:55px;height:calc(100vh - 55px)}
+nav h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 8px 6px}
+nav a{display:block;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:.92rem}
+nav a:hover{background:var(--bg)}nav a.on{background:var(--soft);color:var(--accent);font-weight:600}
+nav small{display:block;color:var(--muted);font-size:.75rem;font-weight:400}
+nav .pie{margin:18px 8px 0;font-size:.75rem;color:var(--muted)}
+main{padding:24px 16px 60px;min-width:0}
+article{max-width:860px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px clamp(16px,4vw,40px)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 18px}
+.chip{font-size:.78rem;padding:3px 9px;border-radius:99px;background:var(--soft);color:var(--ink)}
+.orig{font-size:.85rem;color:var(--accent)}
+.doc table{border-collapse:collapse;width:100%;margin:10px 0;display:block;overflow-x:auto}
+.doc td,.doc th{border:1px solid var(--line);padding:6px 9px;vertical-align:top}
+.doc td p,.doc th p{margin:2px 0}
+.doc img{max-width:100%;height:auto}
+.doc a{color:var(--accent);word-break:break-word}
+.doc p{margin:.45em 0}
+.doc li{margin:.2em 0}
+mark{background:var(--mark);color:inherit;border-radius:2px}
+.res{max-width:860px;margin:0 auto}
+.res a{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:var(--ink);text-decoration:none}
+.res a:hover{border-color:var(--accent)}
+.res b{display:block;margin-bottom:4px}.res span{color:var(--muted);font-size:.88rem}
+.vacio{color:var(--muted);text-align:center;padding:40px 0}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (max-width:760px){
+  .wrap{grid-template-columns:1fr}
+  nav{display:none;position:fixed;inset:55px 0 0 0;height:auto;z-index:4;border:0}
+  body.nav-abierto nav{display:block}
+  #menu{display:block}header h1{display:none}
+  main{padding:14px 0 50px}article{border-radius:0;border-left:0;border-right:0}
+}
+@media print{header,nav{display:none}.wrap{display:block}article{border:0}}
+</style></head><body>
+<header>
+  <button id="menu" aria-label="Índice">☰</button>
+  <h1>Manual de procesos</h1>
+  <input id="q" type="search" placeholder="Buscar en todos los documentos…" aria-label="Buscar">
+  <button id="salir" title="Olvidar la contraseña en este dispositivo">Salir</button>
+</header>
+<div class="wrap"><nav id="nav"></nav><main id="main"></main></div>
+<script>
+const DOCS=__DOCS__, ACT='__ACTUALIZADO__';
+const $=s=>document.querySelector(s), esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+DOCS.forEach(d=>{const t=document.createElement('div');t.innerHTML=d.html;d.texto=t.textContent.replace(/\s+/g,' ');d.nt=norm(d.texto+' '+d.titulo+' '+d.codigo)});
+
+function pintarNav(){
+  let h='',area=null;
+  DOCS.forEach(d=>{if(d.area!==area){area=d.area;h+=`<h2>${esc(area)}</h2>`}
+    h+=`<a href="#d${d.n}" data-n="${d.n}">${esc(d.titulo)}<small>${esc(d.codigo||'')}</small></a>`});
+  h+=`<div class="pie">Actualizado desde Google Docs: ${ACT}</div>`;
+  $('#nav').innerHTML=h;
+}
+function verDoc(n){
+  const d=DOCS.find(x=>x.n==n)||DOCS[0]; if(!d){$('#main').innerHTML='<p class="vacio">Todavía no hay documentos.</p>';return}
+  const chips=[d.codigo&&'Código: '+d.codigo,d.version&&'Versión '+d.version,d.fecha&&'Publicado: '+d.fecha,d.area].filter(Boolean);
+  $('#main').innerHTML=`<article><div class="meta">${chips.map(c=>`<span class="chip">${esc(c)}</span>`).join('')}
+    <a class="orig" href="https://docs.google.com/document/d/${d.id}/edit" target="_blank" rel="noopener">Ver original ↗</a></div>
+    <div class="doc">${d.html}</div></article>`;
+  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.n==d.n));
+  document.title=d.titulo+' · Manual de procesos';
+}
+function resaltar(root,q){
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodos=[];while(w.nextNode())nodos.push(w.currentNode);
+  const nq=norm(q);
+  nodos.forEach(n=>{const t=n.nodeValue,i=norm(t).indexOf(nq);if(i<0)return;
+    const m=document.createElement('mark');const r=document.createRange();r.setStart(n,i);r.setEnd(n,i+q.length);r.surroundContents(m)});
+  const p=root.querySelector('mark');if(p)p.scrollIntoView({block:'center'});
+}
+function buscar(q){
+  const nq=norm(q.trim());
+  if(!nq){ruta();return}
+  const res=DOCS.filter(d=>d.nt.includes(nq));
+  $('#main').innerHTML='<div class="res">'+(res.length?res.map(d=>{
+    const i=norm(d.texto).indexOf(nq),a=Math.max(0,i-80);
+    const frag=i<0?'':(a?'…':'')+esc(d.texto.slice(a,i))+'<mark>'+esc(d.texto.slice(i,i+nq.length))+'</mark>'+esc(d.texto.slice(i+nq.length,i+nq.length+120))+'…';
+    return `<a href="#d${d.n}" data-q="${esc(q.trim())}"><b>${esc(d.titulo)}</b><span>${frag}</span></a>`}).join(''):'<p class="vacio">No hay resultados.</p>')+'</div>';
+}
+function ruta(){const m=location.hash.match(/^#d(\d+)/);verDoc(m?m[1]:(DOCS[0]&&DOCS[0].n));document.body.classList.remove('nav-abierto')}
+$('#q').addEventListener('input',e=>buscar(e.target.value));
+$('#main').addEventListener('click',e=>{const a=e.target.closest('.res a');if(!a)return;e.preventDefault();
+  const q=a.dataset.q;$('#q').value='';history.pushState(null,'',a.getAttribute('href'));ruta();resaltar($('.doc'),q)});
+$('#menu').onclick=()=>document.body.classList.toggle('nav-abierto');
+$('#salir').onclick=()=>{try{localStorage.removeItem('mp-k');sessionStorage.removeItem('mp-k')}catch(e){}location.reload()};
+window.addEventListener('hashchange',()=>{$('#q').value='';ruta()});
+pintarNav();ruta();
+</script>
+</body></html>

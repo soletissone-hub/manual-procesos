@@ -1,0 +1,12 @@
+# Nunca subir: clave, lista de documentos ni vista previa sin cifrar
+datos_trabajo/
+clave.txt
+docs.json
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,27 @@
+name: Actualizar manual desde Google Docs
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # cada 30 minutos
+  workflow_dispatch:          # botón "Run workflow" para actualizar ya
+permissions:
+  contents: write
+concurrency: actualizar
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install cryptography
+      - name: Bajar documentos, cifrar y armar index.html
+        env:
+          DOCS_JSON: ${{ secrets.DOCS_JSON }}
+          CLAVE: ${{ secrets.CLAVE }}
+        run: python scripts/build.py
+      - name: Publicar si hubo cambios
+        run: |
+          git config user.name "manual-bot"
+          git config user.email "actions@github.com"
+          git add index.html huella.txt
+          git diff --cached --quiet || (git commit -m "Actualización automática desde Google Docs" && git push)
